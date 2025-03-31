@@ -222,32 +222,30 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
     if chat.type != constants.ChatType.PRIVATE:
         return # Only process forwards in private chat with the bot
 
-    if not message.forward_from_chat:
-        # This handles cases where the forward is from a user who hides their account
-        # or from a channel where the original sender isn't linked.
-        # We need the chat ID, so if it's missing, we can't proceed.
-         if message.forward_origin and message.forward_origin.type == 'channel':
-             # Forwards from channels might have the chat info here
-             forwarded_chat = message.forward_origin.chat
-         elif message.forward_sender_name: # Last resort, maybe a hidden user forward
-            await message.reply_text(
-                "No puedo identificar el grupo original porque el usuario ha ocultado su cuenta o la información no está disponible. Por favor, reenvía un mensaje de un usuario visible o directamente del grupo/canal.",
-                reply_markup=get_main_menu_keyboard(user.id)
-            )
-            db.set_user_state(user.id, 'idle')
-            return
-         else:
-            await message.reply_text(
-                "No puedo identificar el grupo de origen de este mensaje reenviado. Intenta reenviar un mensaje diferente.",
-                 reply_markup=get_main_menu_keyboard(user.id)
-            )
-            db.set_user_state(user.id, 'idle')
-            return
+    # New approach using forward_origin which is the updated API property
+    forwarded_chat = None
+    
+    # Check if this is a forwarded message with origin info
+    if hasattr(message, 'forward_origin') and message.forward_origin:
+        # For channel forwards (most common case)
+        if message.forward_origin.type == 'channel' and hasattr(message.forward_origin, 'chat'):
+            forwarded_chat = message.forward_origin.chat
+        # Add other forward origin types as needed
 
-    else:
+    # Fallback to legacy approach if available
+    elif hasattr(message, 'forward_from_chat') and message.forward_from_chat:
         forwarded_chat = message.forward_from_chat
-
-
+        
+    # Handle case where we couldn't identify the forwarded chat
+    if not forwarded_chat:
+        await message.reply_text(
+            "No puedo identificar el grupo de origen de este mensaje reenviado. Intenta reenviar un mensaje diferente.",
+            reply_markup=get_main_menu_keyboard(user.id)
+        )
+        db.set_user_state(user.id, 'idle')
+        return
+        
+    # Continue with the existing logic using forwarded_chat
     if not forwarded_chat or forwarded_chat.type not in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.CHANNEL]:
         await message.reply_text(
             "Por favor, reenvía un mensaje desde un **grupo** o **canal**.",
