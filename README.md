@@ -61,5 +61,5 @@ El bot permite a usuarios autorizados configurar un "grupo base" y uno o más "g
 
 ## 👨‍💻 Autor
 
-- **Creador:** Pau Perales
+- **Creador:** DimitriFrog
 - **Rol:** Desarrollador y usuario principal del bot para la comunidad [@notradesnogains](https://t.me/notradesnogains).
