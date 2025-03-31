@@ -197,20 +197,29 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             group_id = int(callback_data.split('_')[-1])
             known_chats = context.bot_data.get('known_chats', {})
             group_name = known_chats.get(group_id, f"Grupo desconocido ({group_id})")
+            logger.info(f"[User:{user_id} CB] Selected base group via button: chat_id={group_id}, name='{group_name}'")
 
             # Check bot membership (best effort)
+            bot_status = "Unknown"
             try:
+                 logger.debug(f"[User:{user_id} CB] Attempting get_chat_member for chat {group_id} (bot ID: {context.bot.id})")
                  bot_member = await context.bot.get_chat_member(group_id, context.bot.id)
-                 if bot_member.status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
-                     raise Exception("Bot not member")
+                 bot_status = bot_member.status
+                 logger.info(f"[User:{user_id} CB] Bot membership status in {group_id}: {bot_status}")
+                 if bot_status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
+                     logger.warning(f"[User:{user_id} CB] Bot status is {bot_status} in chat {group_id}, raising exception for warning flow.")
+                     raise Exception(f"Bot status is {bot_status}")
             except Exception as e:
-                 logger.warning(f"Could not verify bot membership in {group_id} ({group_name}) during selection: {e}")
+                 logger.error(f"[User:{user_id} CB] Error during get_chat_member for {group_id} or bot status check: {e!r}")
                  await context.bot.send_message(
                      chat_id=user_id,
-                     text=f"⚠️ **¡Atención!** No pude confirmar si estoy en el grupo '{group_name}'. Asegúrate de que me han añadido.",
+                     text=f"⚠️ **¡Atención!** No he podido confirmar si estoy en el grupo '{group_name}'. "
+                          f"Asegúrate de que he sido añadido correctamente.\n\n"
+                          f"Continuaré con la configuración, pero podría fallar si no estoy en el grupo.",
                      parse_mode=constants.ParseMode.HTML
                  )
-                 # Allow setting anyway, but warn the user
+                 # Continue with configuration despite warning
+                 logger.info(f"[User:{user_id} CB] Proceeding with configuration for chat {group_id} despite membership check warning.")
 
             # Set base group in DB
             db.set_base_group(user_id, group_id, group_name)
@@ -297,14 +306,20 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             group_id = int(callback_data.split('_')[-1])
             known_chats = context.bot_data.get('known_chats', {})
             group_name = known_chats.get(group_id, f"Grupo desconocido ({group_id})")
+            logger.info(f"[User:{user_id} CB] Selected dest group via button: chat_id={group_id}, name='{group_name}'")
 
             # Check bot membership (best effort)
+            bot_status = "Unknown"
             try:
+                 logger.debug(f"[User:{user_id} CB] Attempting get_chat_member for chat {group_id} (bot ID: {context.bot.id})")
                  bot_member = await context.bot.get_chat_member(group_id, context.bot.id)
-                 if bot_member.status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
-                     raise Exception("Bot not member")
+                 bot_status = bot_member.status
+                 logger.info(f"[User:{user_id} CB] Bot membership status in {group_id}: {bot_status}")
+                 if bot_status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
+                     logger.warning(f"[User:{user_id} CB] Bot status is {bot_status} in chat {group_id}, raising exception for warning flow.")
+                     raise Exception(f"Bot status is {bot_status}")
             except Exception as e:
-                 logger.warning(f"Could not verify bot membership in {group_id} ({group_name}) during selection: {e}")
+                 logger.error(f"[User:{user_id} CB] Error during get_chat_member for {group_id} or bot status check: {e!r}")
                  await context.bot.send_message(
                      chat_id=user_id,
                      text=f"⚠️ **¡Atención!** No pude confirmar si estoy en el grupo '{group_name}'. Asegúrate de que me han añadido.",
@@ -329,7 +344,9 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
                 return # Keep state, let user choose again
 
             # --- Add Destination Group ---
+            logger.info(f"[User:{user_id} CB] Attempting to add destination group: chat_id={group_id}, name='{group_name}'")
             db.add_destination_group(user_id, group_id, group_name)
+            logger.info(f"[User:{user_id} CB] Successfully added destination group {group_id}.")
             db.set_user_state(user_id, 'idle')
             dest_count = len(db.get_destination_groups(user_id))
             await query.edit_message_text(
@@ -493,13 +510,20 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
     logger.info(f"Received forwarded message from chat {group_id} ({group_name}) for user {user_id} in state {current_state}")
 
     # Check bot membership (best effort)
+    bot_status = "Unknown"
     try:
+        logger.debug(f"[User:{user_id}] Attempting get_chat_member for chat {group_id} (bot ID: {context.bot.id})")
         bot_member = await context.bot.get_chat_member(group_id, context.bot.id)
-        if bot_member.status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
-            raise Exception("Bot not member") # Treat as not being a member
-        logger.info(f"Bot is a member of group {group_id} with status {bot_member.status}")
+        bot_status = bot_member.status
+        logger.info(f"[User:{user_id}] Bot membership status in {group_id}: {bot_status}")
+        if bot_status in [constants.ChatMemberStatus.LEFT, constants.ChatMemberStatus.KICKED]:
+            # Log specific KICKED/LEFT status before raising general exception
+            logger.warning(f"[User:{user_id}] Bot status is {bot_status} in chat {group_id}, raising exception for warning flow.")
+            raise Exception(f"Bot status is {bot_status}") # Raise to trigger the warning message flow
+
     except Exception as e:
-        logger.warning(f"Could not verify bot membership in {group_id} ({group_name}): {e}")
+        # Log the specific error received from get_chat_member or the self-raised exception
+        logger.error(f"[User:{user_id}] Error during get_chat_member for {group_id} or bot status check: {e!r}") # Log repr(e)
         await message.reply_text(
              f"⚠️ **¡Atención!** No he podido confirmar si estoy en el grupo '{group_name}'. "
              f"Asegúrate de que he sido añadido correctamente.\n\n"
@@ -507,10 +531,13 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             parse_mode=constants.ParseMode.HTML
         )
         # Continue with configuration despite warning
+        logger.info(f"[User:{user_id}] Proceeding with configuration for chat {group_id} despite membership check warning.")
 
     if current_state == 'awaiting_base_forward':
         try:
+            logger.info(f"[User:{user_id}] Attempting to set base group: chat_id={group_id}, name='{group_name}'")
             db.set_base_group(user_id, group_id, group_name)
+            logger.info(f"[User:{user_id}] Successfully set base group {group_id}.")
             await message.reply_text(
                 f"✅ ¡Estupendo! Has establecido '{group_name}' como tu **grupo base**.\n\n"
                 f"Ahora puedes añadir grupos destino desde el menú.",
@@ -554,7 +581,9 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             return
 
         try:
+            logger.info(f"[User:{user_id}] Attempting to add destination group: chat_id={group_id}, name='{group_name}'")
             db.add_destination_group(user_id, group_id, group_name)
+            logger.info(f"[User:{user_id}] Successfully added destination group {group_id}.")
             dest_count = len(db.get_destination_groups(user_id))
             await message.reply_text(
                 f"✅ ¡Grupo destino '{group_name}' añadido! "
