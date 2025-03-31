@@ -50,6 +50,18 @@ def initialize_database():
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_dest_group_id ON destination_groups (dest_group_id);
         """)
+        
+        # Tabla known_chats para almacenar grupos conocidos
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS known_chats (
+                chat_id INTEGER PRIMARY KEY,
+                chat_title TEXT NOT NULL,
+                chat_type TEXT NOT NULL,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE
+            )
+        """)
+        
         conn.commit()
         logger.info("Database initialized successfully.")
     except sqlite3.Error as e:
