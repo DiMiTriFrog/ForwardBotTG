@@ -9,6 +9,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
     ContextTypes,
+    ConversationHandler,
 )
 
 import config
@@ -38,8 +39,18 @@ def main() -> None:
     application = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
 
     # --- Register Handlers ---
-    # Command Handlers (private chat)
-    application.add_handler(CommandHandler("start", handlers.start, filters=filters.ChatType.PRIVATE))
+    
+    # Password verification conversation handler
+    password_conversation = ConversationHandler(
+        entry_points=[CommandHandler("start", handlers.start, filters=filters.ChatType.PRIVATE)],
+        states={
+            handlers.AWAITING_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.verify_password)]
+        },
+        fallbacks=[CommandHandler("start", handlers.start)],
+        name="password_conversation",
+        persistent=False
+    )
+    application.add_handler(password_conversation)
 
     # Callback Query Handler (button presses)
     application.add_handler(CallbackQueryHandler(handlers.button_callback_handler))
@@ -51,7 +62,13 @@ def main() -> None:
         handlers.handle_forwarded_message
     ))
 
-    # 2. Handle regular messages in groups/channels for forwarding
+    # 2. Handle regular messages in private chat
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+        handlers.handle_message
+    ))
+
+    # 3. Handle regular messages in groups/channels for forwarding
     #    - Only in groups/supergroups/channels
     #    - Ignore commands (/...) in groups
     #    - Ignore edited messages (can cause issues with forwarding)

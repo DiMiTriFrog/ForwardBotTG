@@ -62,6 +62,15 @@ def initialize_database():
             )
         """)
         
+        # Table to track authenticated users
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS authenticated_users (
+                user_id INTEGER PRIMARY KEY,
+                authenticated BOOLEAN DEFAULT FALSE,
+                auth_timestamp TIMESTAMP DEFAULT NULL
+            )
+        """)
+        
         conn.commit()
         logger.info("Database initialized successfully.")
     except sqlite3.Error as e:
@@ -220,6 +229,31 @@ def check_destination_conflict(base_group_id_to_check: int, dest_group_id_to_che
     cursor.execute(query, params)
 
     return cursor.fetchone() is not None # Conflict exists if a row is found
+
+def set_user_authenticated(user_id: int, authenticated: bool = True):
+    """Sets the authentication status for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if authenticated:
+        cursor.execute("""
+            INSERT OR REPLACE INTO authenticated_users (user_id, authenticated, auth_timestamp)
+            VALUES (?, TRUE, CURRENT_TIMESTAMP)
+        """, (user_id,))
+    else:
+        cursor.execute("""
+            INSERT OR REPLACE INTO authenticated_users (user_id, authenticated, auth_timestamp)
+            VALUES (?, FALSE, NULL)
+        """, (user_id,))
+    conn.commit()
+    logger.info(f"User {user_id} authentication status set to {authenticated}")
+
+def is_user_authenticated(user_id: int) -> bool:
+    """Checks if a user is authenticated."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT authenticated FROM authenticated_users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    return bool(result and result['authenticated']) if result else False
 
 # Consider adding functions to periodically close idle connections if using thread-local storage
 # in a very long-running or high-concurrency scenario, though for typical bot usage,

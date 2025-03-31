@@ -3,6 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, constan
 from telegram.ext import ContextTypes, ConversationHandler
 import database as db
 import math # Add math import for ceiling division
+import config # Import config to access ACCESS_PASSWORD
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 CHATS_PER_PAGE = 5
 CALLBACK_PREFIX_BASE = 'sel_base'
 CALLBACK_PREFIX_DEST = 'sel_dest'
+
+# States for ConversationHandler
+AWAITING_PASSWORD = 1
 
 # States for ConversationHandler (if needed, though we manage state in DB)
 # We'll primarily use db.get_user_state for simpler logic flow here
@@ -107,11 +111,44 @@ def get_group_selection_keyboard(
     return InlineKeyboardMarkup(keyboard)
 
 # --- Command Handlers ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /start command, displays the main menu and instructions."""
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the /start command, prompts for password if not authenticated."""
     user = update.effective_user
     user_id = user.id
     logger.info(f"User {user_id} ({user.username}) started the bot.")
+
+    # Check if user is already authenticated
+    if db.is_user_authenticated(user_id):
+        return await show_main_menu(update, context)
+    else:
+        # Ask for password
+        await update.message.reply_html(
+            f"¡Hola {user.mention_html()}! 👋\n\n"
+            "Por favor, introduce la contraseña de acceso para usar este bot:"
+        )
+        # Set state for conversation handler
+        return AWAITING_PASSWORD
+
+async def verify_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Verifies the password provided by the user."""
+    user_id = update.effective_user.id
+    password_attempt = update.message.text
+    
+    # Check if password is correct
+    if password_attempt == config.ACCESS_PASSWORD:
+        # Mark user as authenticated
+        db.set_user_authenticated(user_id, True)
+        await update.message.reply_text("¡Contraseña correcta! Ahora puedes usar el bot.")
+        return await show_main_menu(update, context)
+    else:
+        # Password incorrect
+        await update.message.reply_text("Contraseña incorrecta. Usa /start para intentarlo de nuevo.")
+        return ConversationHandler.END
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Shows the main menu after successful authentication."""
+    user = update.effective_user
+    user_id = user.id
 
     # Ensure user exists in DB, set state to idle if new
     if db.get_user_state(user_id) is None:
@@ -137,6 +174,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=get_main_menu_keyboard(user_id),
         disable_web_page_preview=True
     )
+    return ConversationHandler.END
 
 # --- Callback Query Handlers ---
 async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -147,6 +185,13 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     callback_data = query.data
 
     logger.debug(f"Received callback query: {callback_data} from user {user_id}")
+
+    # Check if user is authenticated
+    if not db.is_user_authenticated(user_id):
+        await query.edit_message_text(
+            "⚠️ No estás autenticado. Por favor, usa /start e introduce la contraseña de acceso."
+        )
+        return
 
     # --- Main Menu Actions ---
     if callback_data == 'main_menu':
@@ -463,6 +508,14 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
     user = update.effective_user
     message = update.effective_message
     chat = update.effective_chat
+    user_id = user.id
+
+    # Check if user is authenticated
+    if not db.is_user_authenticated(user_id):
+        await message.reply_text(
+            "⚠️ No estás autenticado. Por favor, usa /start e introduce la contraseña de acceso."
+        )
+        return
 
     if chat.type != constants.ChatType.PRIVATE:
         return # Only process forwards in private chat with the bot
@@ -485,23 +538,22 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
     if not forwarded_chat:
         await message.reply_text(
             "No puedo identificar el grupo de origen de este mensaje reenviado. Intenta reenviar un mensaje diferente.",
-            reply_markup=get_main_menu_keyboard(user.id)
+            reply_markup=get_main_menu_keyboard(user_id)
         )
-        db.set_user_state(user.id, 'idle')
+        db.set_user_state(user_id, 'idle')
         return
         
     # Continue with the existing logic using forwarded_chat
     if not forwarded_chat or forwarded_chat.type not in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.CHANNEL]:
         await message.reply_text(
             "Por favor, reenvía un mensaje desde un **grupo** o **canal**.",
-             reply_markup=get_main_menu_keyboard(user.id)
+             reply_markup=get_main_menu_keyboard(user_id)
         )
-        db.set_user_state(user.id, 'idle')
+        db.set_user_state(user_id, 'idle')
         return
 
     group_id = forwarded_chat.id
     group_name = forwarded_chat.title or f"Grupo/Canal sin nombre (ID: {group_id})"
-    user_id = user.id
     current_state = db.get_user_state(user_id)
 
     # Add the successfully identified chat to known chats
@@ -545,7 +597,7 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
                 parse_mode=constants.ParseMode.HTML
             )
         except ValueError as e: # Handles specific errors from db layer
-             await message.reply_text(f"⚠️ Error al establecer grupo base: {e}", reply_markup=get_main_menu_keyboard(user.id))
+             await message.reply_text(f"⚠️ Error al establecer grupo base: {e}", reply_markup=get_main_menu_keyboard(user_id))
         except Exception as e:
             logger.error(f"Unexpected error setting base group for {user_id}: {e}")
             await message.reply_text("❌ Ocurrió un error inesperado al guardar el grupo base.", reply_markup=get_main_menu_keyboard(user_id))
@@ -604,7 +656,7 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
         # Received a forwarded message but wasn't expecting one
         await message.reply_text(
             "Recibí un mensaje reenviado, pero no estaba esperando uno ahora mismo. Si querías configurar un grupo, usa los botones del menú primero.",
-            reply_markup=get_main_menu_keyboard(user.id)
+            reply_markup=get_main_menu_keyboard(user_id)
         )
 
 
@@ -620,50 +672,52 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if chat.type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.CHANNEL]:
         add_known_chat(context, chat.id, chat.title or f"Chat sin nombre ({chat.id})") # Use helper
 
-    # Ignore messages from other bots? (Optional, usually good)
-    if message.from_user and message.from_user.is_bot: # Added check for message.from_user
-        return
+    # Get all forwarding configurations
+    forwarding_config = db.get_all_forwarding_configs()
+    
+    # Check if this chat is registered as a base group for message forwarding
+    if chat.id not in forwarding_config:
+        return # This group isn't configured as a base group, ignore message
+        
+    # Get list of destination groups for this base group
+    destinations = forwarding_config[chat.id]
+    if not destinations:
+        return # No destinations configured for this base group
+        
+    # We have destinations for this base group!
+    logger.debug(f"Processing message in base group {chat.id} for forwarding to {len(destinations)} destinations")
+    
+    # Forward the message to all destination groups
+    forwarded_count = 0
+    for dest_id in destinations:
+        try:
+            # Check if the user is authenticated before actually forwarding
+            # Get the user ID associated with this base group
+            conn = db.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM users_config WHERE base_group_id = ?", (chat.id,))
+            result = cursor.fetchone()
+            
+            if result:
+                user_id = result['user_id']
+                # Only forward if the user is authenticated
+                if not db.is_user_authenticated(user_id):
+                    logger.warning(f"Skipping forwarding from group {chat.id} to {dest_id} - User {user_id} not authenticated")
+                    continue
+                    
+            # Forward the message (different methods based on type)
+            await context.bot.forward_message(
+                chat_id=dest_id,
+                from_chat_id=chat.id,
+                message_id=message.message_id
+            )
+            forwarded_count += 1
+        except Exception as e:
+            logger.error(f"Failed to forward message {message.message_id} from {chat.id} to {dest_id}: {e}")
+            # TODO: Consider notifying the user who configured this rule if forwarding fails repeatedly?
 
-    # Ignore commands in groups (we handle them in private chat)
-    if message.text and message.text.startswith('/'):
-        return
-
-    # --- Forwarding Logic ---
-    current_chat_id = chat.id
-    # Load all active forwarding rules (cache this in context.bot_data if performance becomes an issue)
-    # For simplicity now, we query DB on each message. DB access is fast with indexes.
-    # Ensure db.get_all_forwarding_configs() exists and returns a dict like {base_chat_id: [dest_chat_id1, dest_chat_id2]}
-    all_configs = db.get_all_forwarding_configs() # Make sure this function exists and works as expected
-
-    if current_chat_id in all_configs:
-        destination_ids = all_configs[current_chat_id]
-        if not destination_ids:
-            logger.debug(f"Message received in base group {current_chat_id}, but no destinations configured.")
-            return
-
-        logger.info(f"Message received in configured base group {current_chat_id}. Forwarding to {len(destination_ids)} destinations: {destination_ids}")
-
-        successful_forwards = 0
-        failed_forwards = 0
-
-        for dest_id in destination_ids:
-            try:
-                # Use forward_message for cleaner attribution
-                await context.bot.forward_message(
-                    chat_id=dest_id,
-                    from_chat_id=current_chat_id,
-                    message_id=message.message_id
-                )
-                successful_forwards += 1
-            except Exception as e:
-                failed_forwards += 1
-                logger.error(f"Failed to forward message {message.message_id} from {current_chat_id} to {dest_id}: {e}")
-                # TODO: Consider notifying the user who configured this rule if forwarding fails repeatedly?
-
-        if failed_forwards > 0:
-            logger.warning(f"Forwarding completed for message {message.message_id} from {current_chat_id}. Success: {successful_forwards}, Failed: {failed_forwards}")
-
-    # else: Message is not from a configured base group, ignore.
+    if forwarded_count > 0:
+        logger.info(f"Forwarding completed for message {message.message_id} from {chat.id}. Forwarded: {forwarded_count}")
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log Errors caused by Updates."""
@@ -686,3 +740,27 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
              db.set_user_state(user_id, 'idle')
         except Exception as e:
              logger.error(f"Failed to send error message to user {user_id}: {e}") 
+
+# --- Message Handler ---
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles regular messages in private chat."""
+    user_id = update.effective_user.id
+    message = update.effective_message
+    chat = update.effective_chat
+    
+    # Only handle private chat messages
+    if chat.type != constants.ChatType.PRIVATE:
+        return
+    
+    # Check if user is authenticated
+    if not db.is_user_authenticated(user_id):
+        await message.reply_text(
+            "⚠️ No estás autenticado. Por favor, usa /start e introduce la contraseña de acceso."
+        )
+        return
+    
+    # If user is authenticated, show a reminder of available commands
+    await message.reply_text(
+        "Para interactuar con el bot, usa los botones del menú principal o el comando /start",
+        reply_markup=get_main_menu_keyboard(user_id)
+    ) 
