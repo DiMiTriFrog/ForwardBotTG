@@ -1,44 +1,65 @@
-# Telegram Forwarder Bot
+# 🤖 Telegram Forwarder Bot (No Trades No Gains Edition) 📈
 
-This bot forwards messages from a base group to multiple destination groups.
+Este bot está diseñado para reenviar mensajes de un grupo base de Telegram a múltiples grupos destino. Ha sido desarrollado y es utilizado principalmente para la comunidad gratuita de señales de trading **No Trades No Gains**.
+
+✨ **Únete a nuestra comunidad:**
+
+- **Canal de Telegram:** [@notradesnogains](https://t.me/notradesnogains)
+- **Visita nuestra web:** [notradesnogains.com](https://notradesnogains.com)
+
+---
+
+## 🚀 Cómo Funciona
+
+El bot permite a usuarios autorizados configurar un "grupo base" y uno o más "grupos destino". Cualquier mensaje enviado al grupo base será automáticamente reenviado por el bot a todos los grupos destino configurados por ese usuario.
 
 ## Setup
 
-1.  **Clone the repository:**
+1.  **Clonar el repositorio:**
     ```bash
-    git clone <repository_url>
-    cd <repository_directory>
+    git clone https://github.com/DiMiTriFrog/ForwardBotTG.git # O tu URL si lo has bifurcado
+    cd ForwardBotTG
     ```
-2.  **Create a virtual environment:**
+2.  **Crear un entorno virtual:**
     ```bash
     python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    source venv/bin/activate  # En Windows usa `venv\Scripts\activate`
     ```
-3.  **Install dependencies:**
+3.  **Instalar dependencias:**
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Configure the bot token:**
-    - Rename `.env.example` to `.env`.
-    - Open the `.env` file and replace `YOUR_BOT_TOKEN_HERE` with your actual Telegram Bot Token obtained from BotFather.
-5.  **Run the bot:**
+4.  **Configurar el Token del Bot:**
+    - Copia o renombra `.env.example` a `.env` (si existe un `.env.example`).
+    - Abre el archivo `.env` y reemplaza `YOUR_BOT_TOKEN_HERE` con tu Token de Bot real de Telegram (obtenido de @BotFather).
+5.  **Ejecutar el bot:**
     ```bash
     python main.py
     ```
 
 ## Usage
 
-1.  Start a chat with your bot on Telegram.
-2.  Send `/start` to see the main menu.
-3.  Add the bot to the groups you want to use (both base and destination groups).
-4.  Use the bot's menu to configure the base group and destination groups:
-    - You'll need to forward a message from the target group to the bot's private chat to register it.
-5.  Once configured, the bot will automatically forward messages from the base group to the destination groups.
+1.  Inicia una conversación con tu bot en Telegram.
+2.  Envía `/start` para ver el menú principal.
+3.  **Añade el bot** a los grupos que quieres usar (tanto al grupo base como a los grupos destino). Asegúrate de que tenga permisos para leer y enviar mensajes.
+4.  Usa el menú interactivo del bot para configurar:
+    - **Grupo Base:** El grupo desde donde se copiarán los mensajes.
+    - **Grupos Destino:** Los grupos a donde se enviarán las copias.
+    - _Nota:_ Para registrar un grupo (base o destino), tendrás que **reenviar un mensaje cualquiera** de ese grupo al chat privado con el bot cuando te lo pida.
+5.  Una vez configurado, el bot operará automáticamente.
 
 ## Features
 
-- Forward messages from one group to multiple others.
-- Per-user configuration (each user can set up their own forwarding rules).
-- SQLite database to store configurations.
-- Prevents duplicate configurations (same base -> same destination).
-- Intuitive menu with buttons for managing configurations.
+- 📨 Reenvío (o copia) de mensajes de un grupo base a múltiples destinos.
+- 👤 Configuración **por usuario**: Cada usuario gestiona sus propias reglas de reenvío.
+- 💾 Base de datos **SQLite** para persistir las configuraciones.
+- 🚫 Prevención de **conflictos**: No permite que dos usuarios configuren el mismo reenvío (mismo origen -> mismo destino).
+- ⚙️ Menú **intuitivo** con botones para añadir, ver y borrar configuraciones.
+- 🚀 Implementación **asíncrona** usando `python-telegram-bot`.
+
+---
+
+## 👨‍💻 Autor
+
+- **Creador:** Pau Perales
+- **Rol:** Desarrollador y usuario principal del bot para la comunidad [@notradesnogains](https://t.me/notradesnogains).
