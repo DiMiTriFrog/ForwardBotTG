@@ -155,17 +155,17 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
          db.set_user_state(user_id, 'idle')
 
     welcome_message = (
-        f"¡Hola {user.mention_html()}! 👋<br><br>"
-        f"Soy tu asistente para reenviar mensajes entre grupos de Telegram.<br><br>"
-        f"<b>¿Cómo funciona?</b><br>"
-        f"1. <b>Añádeme</b> a los grupos que quieres usar (el grupo 'base' de donde leeré los mensajes y los grupos 'destino' a donde los enviaré).<br>"
-        f"2. Usa el menú de abajo para <b>configurar</b> cuál es tu grupo base y cuáles son tus grupos destino.<br>"
-        f"   - Para configurar un grupo, deberás <b>reenviarme un mensaje cualquiera</b> de ese grupo.<br>"
-        f"3. Una vez configurado, reenviaré automáticamente los mensajes del grupo base a los grupos destino.<br><br>"
-        f"<b>Importante:</b><br>"
-        f"- Solo puedo leer/reenviar mensajes si estoy en los grupos y tengo permisos.<br>"
-        f"- Cada usuario tiene su propia configuración independiente.<br>"
-        f"- No se permite que dos configuraciones distintas usen el mismo grupo base para reenviar al <i>mismo</i> grupo destino.<br><br>"
+        f"¡Hola {user.mention_html()}! 👋\n\n"
+        f"Soy tu asistente para reenviar mensajes entre grupos de Telegram.\n\n"
+        f"<b>¿Cómo funciona?</b>\n"
+        f"1. <b>Añádeme</b> a los grupos que quieres usar (el grupo 'base' de donde leeré los mensajes y los grupos 'destino' a donde los enviaré).\n"
+        f"2. Usa el menú de abajo para <b>configurar</b> cuál es tu grupo base y cuáles son tus grupos destino.\n"
+        f"   - Para configurar un grupo, deberás <b>reenviarme un mensaje cualquiera</b> de ese grupo.\n"
+        f"3. Una vez configurado, reenviaré automáticamente los mensajes del grupo base a los grupos destino.\n\n"
+        f"<b>Importante:</b>\n"
+        f"- Solo puedo leer/reenviar mensajes si estoy en los grupos y tengo permisos.\n"
+        f"- Cada usuario tiene su propia configuración independiente.\n"
+        f"- No se permite que dos configuraciones distintas usen el mismo grupo base para reenviar al <i>mismo</i> grupo destino.\n\n"
         f"Usa los botones de abajo para empezar:"
     )
 
@@ -477,19 +477,19 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         base_group = db.get_base_group(user_id)
         dest_groups = db.get_destination_groups(user_id)
 
-        message = "<b>⚙️ Tu Configuración Actual ⚙️</b><br><br>"
+        message = "<b>⚙️ Tu Configuración Actual ⚙️</b>\n\n"
         if base_group:
             base_id, base_name = base_group
-            message += f"<b>*️⃣ Grupo Base:</b> {base_name} (ID: <code>{base_id}</code>)<br>"
+            message += f"<b>*️⃣ Grupo Base:</b> {base_name} (ID: <code>{base_id}</code>)\n"
         else:
-            message += "<b>*️⃣ Grupo Base:</b> ¡No establecido!<br>"
+            message += "<b>*️⃣ Grupo Base:</b> ¡No establecido!\n"
 
-        message += f"<br><b>➡️ Grupos Destino ({len(dest_groups)}):</b><br>"
+        message += f"\n<b>➡️ Grupos Destino ({len(dest_groups)}):</b>\n"
         if dest_groups:
             for i, (dest_id, dest_name) in enumerate(dest_groups):
-                message += f"  {i+1}. {dest_name} (ID: <code>{dest_id}</code>)<br>"
+                message += f"  {i+1}. {dest_name} (ID: <code>{dest_id}</code>)\n"
         else:
-            message += "  ¡Ninguno! No se reenviarán mensajes.<br>"
+            message += "  ¡Ninguno! No se reenviarán mensajes.\n"
 
         await query.edit_message_text(
             text=message,
@@ -591,7 +591,7 @@ async def handle_forwarded_message(update: Update, context: ContextTypes.DEFAULT
             db.set_base_group(user_id, group_id, group_name)
             logger.info(f"[User:{user_id}] Successfully set base group {group_id}.")
             await message.reply_text(
-                f"✅ ¡Estupendo! Has establecido '{group_name}' como tu <b>grupo base</b>.<br><br>"
+                f"✅ ¡Estupendo! Has establecido '{group_name}' como tu <b>grupo base</b>.\n\n"
                 f"Ahora puedes añadir grupos destino desde el menú.",
                 reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode=constants.ParseMode.HTML
