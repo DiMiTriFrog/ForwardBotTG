@@ -55,13 +55,11 @@ def main() -> None:
     #    - Only in groups/supergroups/channels
     #    - Ignore commands (/...) in groups
     #    - Ignore edited messages (can cause issues with forwarding)
-    #    - Ignore messages from bots (optional, usually desired)
     application.add_handler(MessageHandler(
         (filters.ChatType.GROUPS | filters.ChatType.CHANNEL)
         & ~filters.COMMAND
         & ~filters.UpdateType.EDITED_MESSAGE
-        & ~filters.UpdateType.EDITED_CHANNEL_POST
-        & (~filters.FromUser.is_bot if hasattr(filters.FromUser, 'is_bot') else filters.ALL), # Check if is_bot filter exists
+        & ~filters.UpdateType.EDITED_CHANNEL_POST,
         handlers.handle_group_message
     ))
 
@@ -69,24 +67,36 @@ def main() -> None:
     application.add_error_handler(handlers.error_handler)
 
     # Graceful shutdown handler
-    #def signal_handler(sig, frame):
-    #    logger.info("Received signal to stop. Shutting down gracefully...")
-    #    # Close DB connection pool or thread-local connections if necessary
-    #    db.close_db_connection() # Close connection for the main thread
-    #    # PTB Application shutdown is handled by run_polling on SIGINT/TERM/ABRT
-    #    logger.info("Database connections closed (main thread). Exiting.")
-    #    # Let PTB handle the rest of the shutdown
+    def signal_handler(sig, frame):
+        logger.info("Received signal to stop. Shutting down gracefully...")
+        # Close DB connection pool or thread-local connections if necessary
+        try:
+            db.close_db_connection() # Close connection for the main thread
+            logger.info("Database connections closed (main thread). Exiting.")
+        except Exception as e:
+            logger.error(f"Error closing database connections: {e}")
+        # PTB Application shutdown is handled by run_polling on SIGINT/TERM/ABRT
 
-    #signal.signal(signal.SIGINT, signal_handler)
-    #signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot polling...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-    # Close DB connection on clean exit (might not be reached if killed abruptly)
-    # logger.info("Closing main thread DB connection post-polling.")
-    # db.close_db_connection()
+    try:
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True, # Ignore messages received while bot was offline
+            close_loop=False           # Allows for cleaner shutdown
+        )
+    except Exception as e:
+        logger.critical(f"Error during polling: {e}")
+    finally:
+        # Close DB connection on clean exit 
+        logger.info("Closing main thread DB connection post-polling.")
+        try:
+            db.close_db_connection()
+        except Exception as e:
+            logger.error(f"Error closing database connections on shutdown: {e}")
 
 if __name__ == "__main__":
     main() 
