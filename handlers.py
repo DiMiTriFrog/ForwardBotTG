@@ -171,7 +171,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
              # Fallback if no known groups yet
              db.set_user_state(user_id, 'awaiting_base_forward')
              await query.edit_message_text(
-                 text="No conozco ningún grupo aún. Por favor, **reenvíame un mensaje cualquiera** del grupo que quieres usar como **grupo base**. Asegúrate de que estoy en ese grupo.",
+                 text="No conozco ningún grupo aún\. Por favor, **reenvíame un mensaje cualquiera** del grupo que quieres usar como **grupo base**\. Asegúrate de que estoy en ese grupo\.",
                  parse_mode=constants.ParseMode.MARKDOWN_V2
              )
 
@@ -188,7 +188,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     elif callback_data == f'{CALLBACK_PREFIX_BASE}_forward_fallback':
         db.set_user_state(user_id, 'awaiting_base_forward')
         await query.edit_message_text(
-             text="Ok, por favor, **reenvíame un mensaje cualquiera** del grupo que quieres usar como **grupo base**. Asegúrate de que estoy en ese grupo.",
+             text="Ok, por favor, **reenvíame un mensaje cualquiera** del grupo que quieres usar como **grupo base**\. Asegúrate de que estoy en ese grupo\.",
              parse_mode=constants.ParseMode.MARKDOWN_V2
          )
 
@@ -264,7 +264,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             # Fallback if no known groups yet
             db.set_user_state(user_id, 'awaiting_dest_forward')
             await query.edit_message_text(
-                text="No conozco ningún grupo aún. Por favor, **reenvíame un mensaje cualquiera** del grupo que quieres añadir como **destino**. Asegúrate de que estoy en ese grupo.",
+                text="No conozco ningún grupo aún\. Por favor, **reenvíame un mensaje cualquiera** del grupo que quieres añadir como **destino**\. Asegúrate de que estoy en ese grupo\.",
                 parse_mode=constants.ParseMode.MARKDOWN_V2 # Using Markdown for bold
             )
 
@@ -281,7 +281,7 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     elif callback_data == f'{CALLBACK_PREFIX_DEST}_forward_fallback':
         db.set_user_state(user_id, 'awaiting_dest_forward')
         await query.edit_message_text(
-             text="Ok, por favor, **reenvíame un mensaje cualquiera** del grupo que quieres añadir como **destino**. Asegúrate de que estoy en ese grupo.",
+             text="Ok, por favor, **reenvíame un mensaje cualquiera** del grupo que quieres añadir como **destino**\. Asegúrate de que estoy en ese grupo\.",
              parse_mode=constants.ParseMode.MARKDOWN_V2 # Using Markdown for bold
          )
 
